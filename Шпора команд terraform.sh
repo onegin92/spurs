@@ -16,3 +16,6 @@ terraform destroy # удаляет инфраструктуру, управля�
 # В случаях использования команд в скриптах автоматизации, для удобства, используется опция -chdir= для смены рабочей папки перед применением команды:
 terraform -chdir=terraform/configuration apply
 
+# удалить версии состояния, используя их серийный номер
+curl --header "Private-Token: <your_access_token>" --request DELETE "https://gitlab.example.com/api/v4/projects/<your_project_id>/terraform/state/<your_state_name>/versions/<version-serial>"
+
