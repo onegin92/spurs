@@ -1,0 +1,206 @@
+ansible
+
+---
+- name: vCloudDirectorAnsible
+  hosts: localhost
+
+  environment:
+    env_user: "{{ vcd_user }}"
+    env_password: "{{ vcd_password }}"
+    env_host: "{{ vcd_host }}"
+    env_org: "{{ vcd_org }}"
+    env_api_version: "{{ vcd_api }}"
+    env_verify_ssl_certs: "{{ vcd_ssl }}"
+
+  vars:
+    source_vdc: VDC-YUGORIA-100
+    vdc: VDC-YUGORIA-130-HP-CHANGE #VDC в котором создаем ВМ
+    vapp_name: 222-change-test-ams-app #vAPP в vCloud где будут созданы ВМ
+    vapp_network: net_VDC-YUGORIA_change_dev_AMS #Имя сети с vCloud
+    source_template_name: windows2016
+    source_vm_name: windows2016
+    vmpassword: Kd5mUihk
+    project_id: 53 #Идентификатор проекта в ТПМ в котором будет создан пароль локального админа
+    vapp_vms:
+      - name: 222-svt-1clic13
+        ip: 10.222.51.67
+        storage: SSD
+        cpu: 2
+        cores: 1
+        memory: 8192
+        disksize: 102400
+
+  vars_files:
+    - /opt/ansible_work/group_vars/vault #Переменные, которые используются в плейбуках. Типа паролей админов винды и прочее.
+    - /opt/ansible_work/group_vars/vcd_o2.yml #Меняем! Описание: Если надо сменить VCD то используем другой файл. Варианты смотрим в CF
+    - /opt/ansible_work/group_vars/tpm.yml #Перменные, которые использует модуль ТПМ.
+    - /opt/ansible_work/group_vars/windows.yml #Переменные, которые используются для операций в винде.
+
+  roles:
+    - deploy-win-cloud
+
+---
+- name: "TASK 10: Create vApp {{ vapp_name }}"
+  vcd_vapp:
+    vapp_name: "{{ vapp_name }}"
+    vdc: "{{ vdc }}"
+    power_on: False
+    state: present
+
+- name: "TASK 20: Add Network to vApp {{ vapp_name }}"
+  vcd_vapp:
+    vapp_name: "{{ vapp_name }}"
+    vdc: "{{ vdc }}"
+    network: "{{ vapp_network  }}"
+    operation: add_org_network
+
+- name: "TASK 30: Deploy VM From Template: "
+  vcd_vapp_vm:
+    target_vm_name: "{{ item.name }}"
+    target_vapp: "{{ vapp_name }}"
+    source_vdc: "{{ source_vdc }}"
+    target_vdc: "{{ vdc }}"
+    source_catalog_name: "ugsk_oai"
+    source_template_name: "{{ source_template_name }}"
+    source_vm_name: "{{ source_vm_name }}"
+    hostname: "{{ item.name }}"
+    vmpassword: "{{ vmpassword }}"
+    vmpassword_auto: "false"
+    vmpassword_reset: "false"
+    state: "present"
+    ip_allocation_mode: "DHCP"
+    deploy: false
+    power_on: false
+    all_eulas_accepted: "true"
+    storage_profile: "{{ item.storage }}"
+    network: "{{ vapp_network }}"
+  with_items:
+    - "{{ vapp_vms }}" 
+  ignore_errors: True
+
+- name: "TASK 40: Add NIC to VM"
+  vcd_vapp_vm_nic:
+    vm_name: "{{ item.name }}"
+    vapp: "{{ vapp_name }}"
+    vdc: "{{ vdc }}"
+    nics:
+      - nic_id: 0
+        network: "{{ vapp_network  }}"
+        ip_allocation_mode: MANUAL
+        adapter_type: VMXNET3
+        is_connected: true
+        is_primary: true
+        ip_address: "{{ item.ip }}"
+    state: "present"
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK 50: Delete NIC to VM"
+  vcd_vapp_vm_nic:
+    vm_name: "{{ item.name }}"
+    vapp: "{{ vapp_name }}"
+    vdc: "{{ vdc }}"
+    nics:
+      - nic_id: 0
+    state: absent
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK: 60: modify {{ item.name }} cpu"
+  vcd_vapp_vm:
+    target_vm_name: "{{ item.name }}"
+    target_vapp: "{{ vapp_name }}"
+    target_vdc: "{{ vdc }}"
+    virtual_cpus: "{{ item.cpu }}"
+    cores_per_socket: "{{ item.cores }}"
+    state: "update"
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK: 70: modify {{ item.name }} memory"
+  vcd_vapp_vm:
+    target_vm_name: "{{ item.name }}"
+    target_vapp: "{{ vapp_name }}"
+    target_vdc: "{{ vdc }}"
+    memory: "{{ item.memory }}"
+    state: "update"
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK: 80: modify VMs disk 0"
+  vcd_vapp_vm_disk:
+    vm_name: "{{ item.name }}"
+    vapp: "{{ vapp_name }}"
+    vdc: "{{ vdc }}"
+    disks:
+      - name: Hard disk 1
+        size: "{{ item.disksize }}"
+    state: "update"
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK 90: Deploy vApp {{ vapp_name }} VM"
+  vcd_vapp_vm:
+    target_vm_name: "{{ item.name }}"
+    target_vapp: "{{ vapp_name }}"
+    target_vdc: "{{ vdc }}"
+    power_on: true
+    operation: "deploy"
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: Sleep for 60 seconds and continue with play
+  wait_for:
+    timeout: 60
+  delegate_to: localhost
+
+- name: "TASK 100: Join Domain"
+  vars:
+    ansible_user: "{{ win_local_admin }}"
+    ansible_password: "{{ win_local_admin_pass }}"
+    ansible_connection: winrm
+    ansible_port: 5985
+    ansible_winrm_scheme: http
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+  win_domain_membership:
+    dns_domain_name: 'cl1.ugsk.loc'
+    hostname: "{{ item.name }}"
+    domain_admin_user: "{{ win_domain_admin }}"
+    domain_admin_password: "{{ win_domain_admin_pass }}"
+    state: domain
+  delegate_to: "{{ item.ip }}"
+  register: domain_state
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK 110: Resize Disk C"
+  vars:
+    ansible_user: "{{ win_local_admin }}"
+    ansible_password: "{{ win_local_admin_pass }}"
+    ansible_connection: winrm
+    ansible_port: 5985
+    ansible_winrm_scheme: http
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+  win_partition:
+    drive_letter: "C"
+    partition_size: -1
+  delegate_to: "{{ item.ip }}"
+  with_items:
+    - "{{ vapp_vms }}"
+
+- name: "TASK 120: Reboot after join in domain"
+  vars:
+    ansible_user: "{{ win_local_admin }}"
+    ansible_password: "{{ win_local_admin_pass }}"
+    ansible_connection: winrm
+    ansible_port: 5985
+    ansible_winrm_scheme: http
+    ansible_winrm_transport: ntlm
+    ansible_winrm_server_cert_validation: ignore
+  win_reboot:
+  delegate_to: "{{ item.item.ip }}"
+  with_items:
+    - "{{ domain_state.results }}"
+  when: item.reboot_required

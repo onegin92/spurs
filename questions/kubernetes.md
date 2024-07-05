@@ -1,5 +1,15 @@
 ## Kubernetes
 
+# Какие минусы Stateful приложения?
+<details>
+  <summary>Ответ</summary>
+Stateful сохраняет все локально, если накроется, то инфу можно потерять
+лучше использвать Stateless и хранить все удаленно
+</details>
+
+
+
+
 1. Чем отличается Kubernetes от Openshift?
 
 <details>

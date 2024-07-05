@@ -1,5 +1,50 @@
 ## Linux. Basic
 
+Как происходит загрузка операционной системы
+<details>
+  <summary>Ответ</summary>
+Загрузка проходит в два этапа: на первом ядро (в виде сжатого файла-образа) загружается в оперативную память и распаковывается, 
+далее настраиваются такие базовые функции как основное управление памятью. 
+Затем управление в последний раз передается основному процессу запуска ядра.
+</details>
+
+Какие коды сообщений или ошибок http ты знаешь и что это значит?
+<details>
+  <summary>Ответ</summary>
+1хх Informational Codes : 100 - continue, 101 - Switching protocol
+2xx Successful Codes    : 200 - OK, 202 - Accepted
+3xx Redirection Codes   : 301 - Moved Permanetrly, 302 - Found
+4xx Client Error Codes  : 400 - Bad request, 403 - Forbidden, 404 - page not found
+5xx Server Error Codes  : 500 Internal Server error, 503 - Service unavailable
+</details>
+
+Какой командой показать все работающие процессы на Linux
+<details>
+  <summary>Ответ</summary>
+ps aux, top, htop
+</details>
+
+Какой командой на RedHat Limux сделать чтобы сервисы стартовали автоматом при boot ? 
+<details>
+  <summary>Ответ</summary>
+chkconfig on
+</details>
+
+Что внутри директории Linux: /proc
+<details>
+  <summary>Ответ</summary>
+Текущие процессы, их PID по директориям
+</details>
+
+Самая опасная команда Linux 
+<details>
+  <summary>Ответ</summary>
+sudo rm -R /
+</details>
+
+
+
+
 1. Что такое LA? В каких единицах измеряется?
 <details>
   <summary>Ответ</summary>

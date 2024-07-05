@@ -1,0 +1,84 @@
+terraform
+
+terraform {
+  required_providers {
+    vcd = {
+      source  = "hashicorp/vcd"
+      version = "=3.10.0"
+    }
+  }
+  required_version = ">= 1.0.4"
+
+  backend "http" {}
+
+}
+
+provider "vcd" {
+  user                 = var.vcd_user
+  password             = var.vcd_pass
+  org                  = var.vcd_org
+  vdc                  = var.vcd_vdc
+  url                  = var.vcd_url
+  allow_unverified_ssl = var.vcd_allow_unverified_ssl
+}
+
+module "IP-SET" { # модуль с набром всех групп ip-адресов
+ source   = "./modules/IP-SET"
+}
+module "EDGE-YUGORIA-100" { # модуль с правилами для EDGE-YUGORIA-100
+ source   = "./modules/EDGE-YUGORIA-100"
+}
+
+
+#------------ variables.tf ------------#
+
+
+variable "vcd_user" {
+}
+variable "vcd_pass" {
+}
+
+#------------ main.tf modules ------------#
+
+
+resource "vcd_nsxv_firewall_rule" "rule-1000" { 
+  edge_gateway = var.vcd_edge
+  action       = "accept"
+  above_rule_id = module.EDGE-ALL.edge-all-id-rule-0
+  destination { 
+    exclude            = true
+    gateway_interfaces = []
+    ip_addresses = [
+      "10.0.0.0/8"
+    ]
+    ip_sets      = []
+    org_networks = []
+    vm_ids       = []
+  }
+  enabled         = true
+  logging_enabled = false
+  name            = "${var.name_rule_prefix_k8s} to inet" 
+  service { 
+    port        = "80"
+    protocol    = "tcp"
+    source_port = "any"
+  }
+  service { 
+    port        = "443"
+    protocol    = "tcp"
+    source_port = "any"
+  }  
+  source { 
+    exclude            = false
+    gateway_interfaces = []
+    ip_addresses       = [
+      "10.221.37.0/24"
+    ]
+    ip_sets = []
+    org_networks = []
+    vm_ids       = []
+  }
+  lifecycle {
+    create_before_destroy = true
+  }
+}
