@@ -1,0 +1,31 @@
+upstream b2b-cargo-front {
+    server 10.221.41.1:443;
+}
+
+server {
+    listen 443 ssl;
+    server_name b2b-cargo.ugsk.ru;
+
+    # Конфиг для SSL
+    include /etc/nginx/default.d/ssl_wc_ugsk.conf;
+    # Конфиг для Stormwall
+    include /etc/nginx/default.d/stormwall.conf;
+    # Конфиг для логирования в SOC
+    include /etc/nginx/default.d/soc_logs.conf;
+
+    access_log /var/log/nginx/b2b-cargo_access.log main;
+    error_log /var/log/nginx/b2b-cargo_error.log warn;
+
+    location / {
+        proxy_pass https://b2b-cargo-front/;
+        include /etc/nginx/default.d/default_proxy.conf;
+        #allow 10.0.0.0/8;
+        deny all;
+    }
+}
+
+server {
+    listen 80;
+    server_name b2b-cargo.ugsk.ru;
+    return 302 https://$host$request_uri;
+}
