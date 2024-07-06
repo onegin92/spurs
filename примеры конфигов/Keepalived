@@ -1,0 +1,72 @@
+touch /etc/keepalived/keepalived.conf
+
+
+Добавим блок global_defs:
+
+global_defs {
+  router_id LVS_1 # имя балансера
+}
+
+Добавим блок vrrp_instance отвечающий за настройку виртуального роутера, для каждого сетевого интерфейса необходимо настроить, по крайне мере один блок vrrp_instance. Вы можете добавить необходимое количество блоков для каждой группы виртуальных IP:
+vrrp_instance DOVECOT {
+        state MASTER # Указывает на то что в каком состоянии стартует нода
+        interface ens18 # Интерфейс для виртуальных IP
+        lvs_sync_daemon_inteface ens18 # Интерфейс для обмена служебными пакетами между нодами
+        virtual_router_id 102 # Уникальное имя виртуального роутера
+        priority 150 # Приоритет данной ноды относительно других, нода с наибольшим приоритетом переходит в состояние MASTER
+        advert_int 1 # Как часто происходит обновление состояния кластера
+        authentication { # Аутентификация используется для синхронизации между нодами
+            auth_type PASS
+            auth_pass 12345678
+}
+        virtual_ipaddress { # Виртуальные адреса, которые настроит keealived
+            192.168.135.237/24
+}
+}
+Далее следует блок настройки виртуального сервера:
+virtual_server 192.168.135.237 22 {
+        delay_loop 6 # Частота проверок
+        lb_algo lblc # Выбираем режим балансировки, для dovecot лучше выбрать Locality-Based Least-Connection
+        lb_kind DR # Выбираем метод перенаправления, в нашем случае Direct Routing
+        protocol TCP
+        real_server 192.168.135.238 143 { # Описываем back-end серверы
+                weight 1 # Задаем вес сервера
+                TCP_CHECK { # Настраиваем проверку на доступность
+                        connect_timeout 3
+                        connect_port 143
+                        nb_get_retry 3
+                        delay_before_retry 3
+                }
+        }
+        real_server 192.168.135.239 143 {
+                weight 1
+                TCP_CHECK {
+                        connect_timeout 3
+                        connect_port 143
+                        nb_get_retry 3
+                        delay_before_retry 3
+                }
+        }
+}
+
+
+#######################################
+Файл настройки BACKUP сервера отличается только следующими параметрами:
+router_id LVS_2
+state BACKUP
+priority 100
+
+#######################################
+Необходимо настроить виртуальный IP на обоих back-end серверах. Для этого в файл /etc/net/ifaces/ens18/ipv4address добавим наш виртуальный IP:
+192.168.135.237/24
+
+Только MASTER сервер балансировки должен отвечать ARP запросы виртуального IP адреса. Необходимо установить параметры ядра arp_ignore и arp_announce для сетевого интерфейса с виртуальным IP, для того чтобы они не реагировали на ARP запросы для виртуального IP адреса. Для этого для этого в файле /etc/net/sysctl.conf добавим:
+net.ipv4.conf.ens18.arp_ignore = 1
+net.ipv4.conf.ens18.arp_announce = 2
+
+Для немедленного применения выполним:
+sysctl -p
+
+На обоих back-end серверах должен появится виртуальный IP адрес
+
+
