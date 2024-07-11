@@ -231,3 +231,17 @@ round-trip min/avg/max = 15.814/22.208/31.412 ms
 Эфемерные контейнеры предназначены для транзитных задач, когда вам нужно временно [подключить дополнительный контейнер к существующему поду](https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/#ephemeral-container). Это идеально подходит для отладочных операций, когда вы хотите проверить поды, не затрагивая живые экземпляры контейнеров.
 
 </details>
+
+
+Как посмотреть логи docker контейнера за последние 10 минут?
+<details>
+  <summary>Ответ</summary>
+docker logs -f --until=10m nginx
+</details>
+
+
+Где посмотреть IP адрес docker контейнера?
+<details>
+  <summary>Ответ</summary>
+docker inspect <container_name>
+</details>
